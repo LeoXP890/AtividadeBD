@@ -1,0 +1,80 @@
+import sqlite3
+
+# Conexão com o banco de dados
+conn = sqlite3.connect("clientes.db")
+cursor = conn.cursor()
+
+# Função para listar clientes
+def listar_clientes():
+    cursor.execute("SELECT * FROM cliente")
+    clientes = cursor.fetchall()
+    print("\nClientes:")
+    for cliente in clientes:
+        print(f"ID: {cliente[0]}, Nome: {cliente[1]}, Limite: {cliente[2]:.2f}")
+    return clientes
+
+# Função para buscar cliente por ID
+def buscar_cliente(idcliente):
+    cursor.execute("SELECT * FROM cliente WHERE idcliente = ?", (idcliente,))
+    return cursor.fetchone()
+
+# Função para alterar limite de um cliente
+def alterar_cliente():
+    listar_clientes()
+    idcliente = int(input("\nDigite o ID do cliente a ser alterado: "))
+    cliente = buscar_cliente(idcliente)
+    if not cliente:
+        print("Cliente não encontrado!")
+        return
+
+    # Mostra dados do cliente
+    print(f"\nCliente selecionado: ID: {cliente[0]}, Nome: {cliente[1]}, Limite: {cliente[2]:.2f}")
+    novo_limite = float(input("Digite o novo limite: "))
+
+    # Inicia transação
+    try:
+        conn.isolation_level = None
+        cursor.execute("BEGIN")
+        
+        # Verifica consistência dos dados
+        cliente_atualizado = buscar_cliente(idcliente)
+        if cliente_atualizado != cliente:
+            print("Os dados do cliente foram alterados por outro processo.")
+            conn.rollback()
+            return
+
+        # Atualiza o limite
+        cursor.execute("UPDATE cliente SET limite = ? WHERE idcliente = ?", (novo_limite, idcliente))
+        print("\nLimite atualizado com sucesso.")
+        
+        # Confirma alteração
+        confirmacao = input("Deseja confirmar as alterações? (s/n): ").strip().lower()
+        if confirmacao == 's':
+            conn.commit()
+            print("Alteração confirmada.")
+        else:
+            conn.rollback()
+            print("Alteração cancelada.")
+    except sqlite3.Error as e:
+        print(f"Erro durante a transação: {e}")
+        conn.rollback()
+    finally:
+        conn.isolation_level = ""
+
+# Menu principal
+while True:
+    print("\n1. Listar clientes")
+    print("2. Alterar cliente")
+    print("3. Sair")
+    opcao = input("Escolha uma opção: ").strip()
+    if opcao == "1":
+        listar_clientes()
+    elif opcao == "2":
+        alterar_cliente()
+    elif opcao == "3":
+        break
+    else:
+        print("Opção inválida!")
+
+# Fecha conexão
+conn.close()
